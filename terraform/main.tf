@@ -1,10 +1,6 @@
 locals {
   parent_folder_id            = "658965356947" # production folder
   postgresl_driver_remote_url = "https://repo1.maven.org/maven2/org/postgresql/postgresql/42.2.6/postgresql-42.2.6.jar"
-  service_account_roles = [
-    "roles/artifactregistry.admin",
-    "roles/iam.serviceAccountTokenCreator"
-  ]
 }
 
 module "project-factory" {
@@ -25,7 +21,6 @@ module "project-factory" {
   }
   activate_apis = [
     "storage.googleapis.com",
-    "iamcredentials.googleapis.com",
   ]
 }
 
@@ -53,17 +48,4 @@ resource "google_artifact_registry_repository_iam_binding" "binding" {
   members = [
     "serviceAccount:sa-df-lsu@prj-denc-p-bq-3986.iam.gserviceaccount.com",
   ]
-}
-
-resource "google_service_account" "service_account" {
-  account_id   = "sa-for-github-action"
-  display_name = "Service Account created by terraform for ${module.project-factory.project_id}"
-  project      = module.project-factory.project_id
-}
-
-resource "google_project_iam_member" "service_account_bindings" {
-  for_each = toset(local.service_account_roles)
-  project  = module.project-factory.project_id
-  role     = each.value
-  member   = "serviceAccount:${google_service_account.service_account.email}"
 }
