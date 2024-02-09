@@ -105,7 +105,7 @@ if __name__ == '__main__':
     run(app_name="database transfert",
         spark=spark,
         schema=known_args.schema,
-        url=known_args.jdbc_url,
+        url="jdbc:%s" % known_args.jdbc_url,
         dataset=known_args.dataset,
         mode=known_args.mode,
         exclude=known_args.exclude)
