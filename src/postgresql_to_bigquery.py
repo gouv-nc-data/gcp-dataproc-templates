@@ -46,6 +46,10 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
                        .option("url", url) \
                        .option("driver", "org.postgresql.Driver") \
                        .option("query", query) \
+                       .option("TimeStampFormat", "dd-MM-yyyy HH:mm:ss") \
+                       .option("TreatEmptyValuesAsNulls", True) \
+                       .option("IgnoreLeadingWhiteSpace", True) \
+                       .option("IgnoreTrailingWhiteSpace", True) \
                        .load()
 
     get_logger(spark).info("migration de %s tables" % table_names.count())
