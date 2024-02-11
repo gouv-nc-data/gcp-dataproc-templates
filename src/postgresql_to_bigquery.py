@@ -22,7 +22,8 @@ def get_logger(spark: SparkSession) -> Logger:
 def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
     get_logger(spark).info("migration table %s" % table_name['table_name'])
     df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "org.postgresql.Driver"})
-
+    get_logger(spark).info(df.head())
+    get_logger(spark).info("upload de la table %s" % table_name['table_name'])
     df.write \
         .format("bigquery") \
         .option("writeMethod", "direct") \
