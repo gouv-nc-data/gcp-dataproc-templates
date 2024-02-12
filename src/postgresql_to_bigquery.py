@@ -110,6 +110,7 @@ if __name__ == '__main__':
     spark = SparkSession.builder \
         .appName("PostgreSQL Migration with PySpark") \
         .getOrCreate()
+    spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
         
     run(app_name="database transfert",
         spark=spark,
