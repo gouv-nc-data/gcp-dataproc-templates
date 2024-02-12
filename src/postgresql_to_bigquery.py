@@ -27,7 +27,13 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     get_logger(spark).info("###############################################")
     get_logger(spark).info(df.dtypes)
     get_logger(spark).info("###############################################")
+    import pyspark.sql.functions as F
+    for c_name, c_type in df.dtypes:
+        if c_type in ('double', 'float', 'decimal'):
+            df = df.withColumn(c_name, F.round(c_name, 4))
     get_logger(spark).info("upload de la table %s" % table_name['table_name'])
+    get_logger(spark).info(df.dtypes)
+    get_logger(spark).info("###############################################")
     df.write \
         .format("bigquery") \
         .option("writeMethod", "direct") \
