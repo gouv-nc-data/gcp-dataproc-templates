@@ -29,8 +29,9 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     get_logger(spark).info("###############################################")
     import pyspark.sql.functions as F
     for c_name, c_type in df.dtypes:
-        if c_type in ('double', 'float', 'decimal'):
-            df = df.withColumn(c_name, F.round(c_name, 4))
+        if c_type.startsWith('decimal'):
+            get_logger(spark).info("conversion de decimal vers float")
+            df = df.selectExpr("cast(%s as float) %s" % (c_name, c_name))
     get_logger(spark).info("upload de la table %s" % table_name['table_name'])
     get_logger(spark).info(df.dtypes)
     get_logger(spark).info("###############################################")
