@@ -24,10 +24,16 @@ jobs:
       with:
         credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
 
-    - id: 'upload-file'
+    - id: 'upload-postgresql-script'
       uses: 'google-github-actions/upload-cloud-storage@v2'
       with:
         path: 'src/postgresql_to_bigquery.py'
+        destination: 'bucket-prj-dinum-data-templates-66aa'
+        gzip: false
+    - id: 'upload-oracle-script'
+      uses: 'google-github-actions/upload-cloud-storage@v2'
+      with:
+        path: 'src/oracle_to_bigquery.py'
         destination: 'bucket-prj-dinum-data-templates-66aa'
         gzip: false
     
