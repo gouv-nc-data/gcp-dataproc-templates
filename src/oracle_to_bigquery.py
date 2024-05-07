@@ -54,7 +54,7 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
                        .option("IgnoreLeadingWhiteSpace", True) \
                        .option("IgnoreTrailingWhiteSpace", True) \
                        .load()
-
+    get_logger(spark).info(table_names)
     get_logger(spark).info("migration de %s tables" % table_names.count())
 
     for table_name in table_names.collect():
