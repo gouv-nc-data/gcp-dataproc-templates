@@ -35,9 +35,9 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
 
 def query_factory(schema: str, exclude: str = None) -> str:
     if exclude != "":
-        query = "SELECT table_name FROM all_tables where owner = '%s' and table_name not in (%s)" % (schema, exclude)
+        query = "SELECT * FROM all_tables where owner = '%s' and table_name not in (%s)" % (schema, exclude)
     else:
-        query = "SELECT table_name FROM all_tables where owner = '%s'" % schema
+        query = "SELECT * FROM all_tables where owner = '%s'" % schema
     return query
 
 
