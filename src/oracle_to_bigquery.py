@@ -21,21 +21,21 @@ def get_logger(spark: SparkSession) -> Logger:
 
 def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
     get_logger(spark).info("test! %s" % table_name)
-    get_logger(spark).info("migration table %s" % table_name['table_name'])
-    df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "oracle.jdbc.driver.OracleDriver"})
+    get_logger(spark).info("migration table %s" % table_name)
+    df = spark.read.jdbc(url, table_name, properties={"driver": "oracle.jdbc.driver.OracleDriver"})
     # get_logger(spark).info("###############################################")
     # get_logger(spark).info(df.head())
     
-    get_logger(spark).info("upload de la table %s" % table_name['table_name'])
+    get_logger(spark).info("upload de la table %s" % table_name)
     df.write \
         .format("bigquery") \
         .option("writeMethod", "direct") \
         .mode(mode) \
-        .save("%s.%s" % (dataset, table_name['table_name']))
+        .save("%s.%s" % (dataset, table_name))
 
 
 def query_factory(schema: str, exclude: str = None) -> str:
-    get_logger(spark).info("liste des tables exclues du transfert : '%s'")
+    get_logger(spark).info("liste des tables exclues du transfert : '%s'" % exclude)
     if exclude != "":
         query = "SELECT table_name FROM all_tables where owner = '%s' and table_name not in (%s)" % (schema, exclude)
     else:
@@ -56,7 +56,6 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
                        .option("IgnoreLeadingWhiteSpace", True) \
                        .option("IgnoreTrailingWhiteSpace", True) \
                        .load()
-    get_logger(spark).info(table_names.head())
     get_logger(spark).info("migration de %s tables" % table_names.count())
 
     for table_name in table_names.collect():
