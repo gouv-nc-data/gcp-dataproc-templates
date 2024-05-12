@@ -20,6 +20,7 @@ def get_logger(spark: SparkSession) -> Logger:
 
 
 def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
+    get_logger(spark).info("test! %s" % table_name)
     get_logger(spark).info("migration table %s" % table_name['table_name'])
     df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "oracle.jdbc.driver.OracleDriver"})
     # get_logger(spark).info("###############################################")
@@ -34,10 +35,11 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
 
 
 def query_factory(schema: str, exclude: str = None) -> str:
+    get_logger(spark).info("liste des tables exclues du transfert : '%s'")
     if exclude != "":
-        query = "SELECT * FROM all_tables where owner = '%s' and table_name not in (%s)" % (schema, exclude)
+        query = "SELECT table_name FROM all_tables where owner = '%s' and table_name not in (%s)" % (schema, exclude)
     else:
-        query = "SELECT * FROM all_tables where owner = '%s'" % schema
+        query = "SELECT table_name FROM all_tables where owner = '%s'" % schema
     return query
 
 
