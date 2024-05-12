@@ -20,7 +20,7 @@ def get_logger(spark: SparkSession) -> Logger:
 
 
 def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
-    get_logger(spark).info("test! %s" % table_name)
+    get_logger(spark).info("test! %s" % table_name.__class__.__name__)
     get_logger(spark).info("migration table %s" % table_name)
     df = spark.read.jdbc(url, table_name, properties={"driver": "oracle.jdbc.driver.OracleDriver"})
     # get_logger(spark).info("###############################################")
