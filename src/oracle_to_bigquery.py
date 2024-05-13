@@ -25,7 +25,11 @@ def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, da
     df = spark.read.jdbc(url, "%s.%s" % (schema, table_name['TABLE_NAME']), properties={"driver": "oracle.jdbc.driver.OracleDriver"})
     # get_logger(spark).info("###############################################")
     get_logger(spark).info(df.dtypes)
-    
+    for c_name, c_type in df.dtypes:
+        if c_type.startswith('decimal'):
+            get_logger(spark).info("conversion de decimal vers float de la colonne %s" % c_name)
+            df = df.withColumn(c_name, df[c_name].cast("float"))
+            
     get_logger(spark).info("upload de la table %s" % table_name)
     df.write \
         .format("bigquery") \
