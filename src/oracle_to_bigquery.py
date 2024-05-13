@@ -19,10 +19,10 @@ def get_logger(spark: SparkSession) -> Logger:
     return log_4j_logger.LogManager.getLogger(__name__)
 
 
-def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
+def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, dataset: str, mode: str):
     get_logger(spark).info("test! %s" % table_name.__class__.__name__)
     get_logger(spark).info("migration table %s" % table_name)
-    df = spark.read.jdbc(url, table_name, properties={"driver": "oracle.jdbc.driver.OracleDriver"})
+    df = spark.read.jdbc(url, "%s.%s" % (schema, table_name['TABLE_NAME']), properties={"driver": "oracle.jdbc.driver.OracleDriver"})
     # get_logger(spark).info("###############################################")
     # get_logger(spark).info(df.head())
     
@@ -59,10 +59,7 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
     get_logger(spark).info("migration de %s tables" % table_names.count())
     get_logger(spark).info(table_names.show())
     for table_name in table_names.collect():
-        print("################")
-        print("%s.%s" % (schema, table_name['TABLE_NAME']))
-        print("################")
-        upload_table(spark, "%s.%s" % (schema, table_name['TABLE_NAME']), url, dataset, mode)
+        upload_table(spark, schema, table_name, url, dataset, mode)
 
     get_logger(spark).info("fin migration")
 
