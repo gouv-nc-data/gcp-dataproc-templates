@@ -31,7 +31,7 @@ def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, da
         .format("bigquery") \
         .option("writeMethod", "direct") \
         .mode(mode) \
-        .save("%s.%s" % (dataset, table_name))
+        .save("%s.%s" % (dataset, table_name['TABLE_NAME']))
 
 
 def query_factory(schema: str, exclude: str = None) -> str:
