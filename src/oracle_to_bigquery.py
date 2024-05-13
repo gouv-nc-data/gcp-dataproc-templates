@@ -24,7 +24,7 @@ def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, da
     get_logger(spark).info("migration table %s" % table_name)
     df = spark.read.jdbc(url, "%s.%s" % (schema, table_name['TABLE_NAME']), properties={"driver": "oracle.jdbc.driver.OracleDriver"})
     # get_logger(spark).info("###############################################")
-    # get_logger(spark).info(df.head())
+    get_logger(spark).info(df.dtypes)
     
     get_logger(spark).info("upload de la table %s" % table_name)
     df.write \
