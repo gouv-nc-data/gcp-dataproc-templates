@@ -60,9 +60,9 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
     get_logger(spark).info(table_names.show())
     for table_name in table_names.collect():
         print("################")
-        print(table_name)
+        print(table_name['TABLE_NAME'])
         print("################")
-        upload_table(spark, table_name, url, dataset, mode)
+        upload_table(spark, table_name['TABLE_NAME'], url, dataset, mode)
 
     get_logger(spark).info("fin migration")
 
