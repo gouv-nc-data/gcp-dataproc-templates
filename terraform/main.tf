@@ -33,7 +33,7 @@ resource "google_storage_bucket" "bucket" {
 }
 
 resource "google_artifact_registry_repository" "ar_repo_templates" {
-  project                     = module.project-factory.project_id
+  project       = module.project-factory.project_id
   repository_id = "templates"
   description   = "docker repository pour les images templates du GNC"
   format        = "DOCKER"
