@@ -17,12 +17,13 @@ jobs:
     defaults:
       run:
         working-directory: ./terraform
+    concurrency:
+      group: workflow-${{ github.ref }}
+      cancel-in-progress: false
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-        
-      - name: disable concurrency
-        uses: ahmadnassri/action-workflow-queue@v1
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

@@ -30,6 +30,7 @@ jobs:
         path: 'src/postgresql_to_bigquery.py'
         destination: 'bucket-prj-dinum-data-templates-66aa'
         gzip: false
+        
     - id: 'upload-oracle-script'
       uses: 'google-github-actions/upload-cloud-storage@v2'
       with:
