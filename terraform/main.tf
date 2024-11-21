@@ -58,7 +58,7 @@ resource "google_service_account" "service_account" {
 }
 
 resource "google_project_iam_member" "service_account_bindings" {
-  project  = module.project-factory.project_id
-  role     = "roles/artifactregistry.admin"
-  member   = "serviceAccount:${google_service_account.service_account.email}"
+  project = module.project-factory.project_id
+  role    = "roles/artifactregistry.admin"
+  member  = "serviceAccount:${google_service_account.service_account.email}"
 }
