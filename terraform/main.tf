@@ -32,6 +32,9 @@ resource "google_storage_bucket" "bucket" {
   uniform_bucket_level_access = true
 }
 
+# ----------------------------------------------------
+# Ressources nécessitant une custom image
+# ----------------------------------------------------
 resource "google_artifact_registry_repository" "ar_repo_templates" {
   project       = module.project-factory.project_id
   repository_id = "templates"
@@ -44,3 +47,9 @@ resource "google_artifact_registry_repository" "ar_repo_templates" {
   #     keep_count            = 5
   #   }
 }
+
+# resource "google_service_account" "service_account" {
+#   account_id   = "sa-${var.project_name}"
+#   display_name = "Service Account created by terraform for ${var.project_id}"
+#   project      = var.project_id
+# }
