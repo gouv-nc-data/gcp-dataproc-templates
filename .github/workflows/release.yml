@@ -41,7 +41,6 @@ jobs:
     - id: 'upload-jira-to-bq'
       uses: 'google-github-actions/upload-cloud-storage@v2'
       with:
-        path: 'src/jira-to-bigquery.py'
+        path: 'src/jira_to_bigquery.py'
         destination: 'bucket-prj-dinum-data-templates-66aa'
         gzip: false
-        
