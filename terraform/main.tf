@@ -30,6 +30,9 @@ resource "google_storage_bucket" "bucket" {
   location                    = var.region
   storage_class               = "REGIONAL"
   uniform_bucket_level_access = true
+  versioning {
+    enabled = true
+  }
 }
 
 # ----------------------------------------------------
@@ -48,8 +51,14 @@ resource "google_artifact_registry_repository" "ar_repo_templates" {
   #   }
 }
 
-# resource "google_service_account" "service_account" {
-#   account_id   = "sa-${var.project_name}"
-#   display_name = "Service Account created by terraform for ${var.project_id}"
-#   project      = var.project_id
-# }
+resource "google_service_account" "service_account" {
+  account_id   = "sa-artifact-registry"
+  display_name = "Service Account created by terraform for artifact registry write access"
+  project      = module.project-factory.project_id
+}
+
+resource "google_project_iam_member" "service_account_bindings" {
+  project  = module.project-factory.project_id
+  role     = "roles/artifactregistry.admin"
+  member   = "serviceAccount:${google_service_account.service_account.email}"
+}
