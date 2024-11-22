@@ -44,8 +44,6 @@ SCOPES = [ 'https://www.googleapis.com/auth/bigquery']
 if env_local:
     creds = service_account.Credentials.from_service_account_file(cred_file)
 else:
-    if not os.environ['GOOGLE_APPLICATION_CREDENTIALS']:
-        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is not set in the environment.")
     creds, _ = google.auth.default() # from env var GOOGLE_APPLICATION_CREDENTIALS 
 
 # retrive credentials for scopes defined.
