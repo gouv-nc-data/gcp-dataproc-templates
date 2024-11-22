@@ -297,4 +297,4 @@ if __name__ == "__main__":
     bq_client = bigquery.Client(credentials=scoped_credentials)
     jira = JIRA(server=JIRA_URL, token_auth=args.jira_token)
 
-    jira_to_bq(args.jira_projec, args.gcp_project, args.bq_dataset)
+    jira_to_bq(args.jira_project, args.gcp_project, args.bq_dataset)
