@@ -30,10 +30,10 @@ JIRA_URL = "https://jira.gouv.nc"
 # auth
 #----------------------------
 
-# jira
-JIRA_TOKEN = os.environ['JIRA_TOKEN']
-if not JIRA_TOKEN:
-    raise ValueError("JIRA_TOKEN is not set in the environment.")
+# # jira
+# JIRA_TOKEN = os.environ['JIRA_TOKEN']
+# if not JIRA_TOKEN:
+#     raise ValueError("JIRA_TOKEN is not set in the environment.")
 
 # GCP
 cred_file = '' # ex: prj-davar-p-bq-a01c-c04f4c56dc89.json
@@ -282,11 +282,18 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help='nom du dataset BQ')
+    
+    parser.add_argument(
+        '--jira-token',
+        type=str,
+        required=True,
+        help='token du SA bigquery pour jira')
 
     args = parser.parse_args() # transforme les - en _
 
     JIRA_PROJECT = args.jira_project
     GCP_PROJECT_ID = args.gcp_project
     BQ_DATASET = args.bq_dataset
+    JIRA_TOKEN = args.jira_token
 
     jira_to_bq()
