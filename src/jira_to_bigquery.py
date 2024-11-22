@@ -44,7 +44,7 @@ SCOPES = [ 'https://www.googleapis.com/auth/bigquery']
 if env_local:
     creds = service_account.Credentials.from_service_account_file(cred_file)
 else:
-    creds, _ = google.auth.default() # from env var GOOGLE_APPLICATION_CREDENTIALS 
+    creds, _ = google.auth.default()
 
 # retrive credentials for scopes defined.
 scoped_credentials = creds.with_scopes(SCOPES)
@@ -66,15 +66,42 @@ else:
     logging.basicConfig(level=logging.DEBUG) # NOTSET DEBUG INFO WARNING ERROR CRITICAL
 
 #----------------------------
-# Clients
-#----------------------------
-
-bq_client = bigquery.Client(credentials=scoped_credentials)
-jira = JIRA(server=JIRA_URL, token_auth=JIRA_TOKEN)
-
-#----------------------------
 # Fonctions
 #----------------------------
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Synchronisation Jira vers BigQuery")
+
+    parser.add_argument(
+        '--jira-project',
+        type=str,
+        required=True,
+        help='Clé du projet Jira (ex : DATA)'
+        )
+
+    parser.add_argument(
+        '--gcp-project',
+        type=str,
+        required=True,
+        help='nom du projet GCP'
+        )
+
+    parser.add_argument(
+        '--bq-dataset',
+        type=str,
+        required=True,
+        help='nom du dataset BQ'
+        )
+    
+    parser.add_argument(
+        '--jira-token',
+        type=str,
+        required=True,
+        help='token du SA bigquery pour jira'
+        )
+
+    args = parser.parse_args() # transforme les - en _
+    return args
 
 def remove_accents(input_str):
     # Décomposer les caractères Unicode en leurs composants de base
@@ -146,10 +173,10 @@ exclusion_keys = [
     # 'comment'
     ]
 
-def load_to_bq(client, df, table_name): 
+def load_to_bq(client, df, table_name, gcp_project, bq_dataset): 
    # Charger les données dans BigQuery
     job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
-    destination = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{table_name}"
+    destination = f"{gcp_project}.{bq_dataset}.{table_name}"
     job = client.load_table_from_dataframe(df, destination, job_config=job_config)
     job.result()  # Attendre la fin du job
 
@@ -174,26 +201,26 @@ def create_df(issues, field_mapping):
                 
         return pd.DataFrame(data)
 
-def merge_tables(bq_client, target, source):
+def merge_tables(bq_client, target, source, gcp_project, bq_dataset):
     delete_query  = f"""
-    DELETE FROM `{GCP_PROJECT_ID}.{BQ_DATASET}.{target}`
+    DELETE FROM `{gcp_project}.{bq_dataset}.{target}`
     WHERE jira IN (
-    SELECT jira FROM `{GCP_PROJECT_ID}.{BQ_DATASET}.{source}`
+    SELECT jira FROM `{gcp_project}.{bq_dataset}.{source}`
     )
     """
     bq_client.query(delete_query )
     insert_query = f"""
-    INSERT INTO `{GCP_PROJECT_ID}.{BQ_DATASET}.{target}`
-    SELECT * FROM `{GCP_PROJECT_ID}.{BQ_DATASET}.{source}`
+    INSERT INTO `{gcp_project}.{bq_dataset}.{target}`
+    SELECT * FROM `{gcp_project}.{bq_dataset}.{source}`
     """
     bq_client.query(insert_query)
 
-    bq_client.delete_table(f'{GCP_PROJECT_ID}.{BQ_DATASET}.{source}')
+    bq_client.delete_table(f'{gcp_project}.{bq_dataset}.{source}')
     logging.info(f"Table temporaire {source} supprimée.")
 
-def get_last_update_date(bq_client, table_name):
+def get_last_update_date(bq_client, table_name, gcp_project, bq_dataset):
     try:
-        query = f"SELECT max(Mise_a_jour) last_update FROM `{GCP_PROJECT_ID}.{BQ_DATASET}.{table_name}`"
+        query = f"SELECT max(Mise_a_jour) last_update FROM `{gcp_project}.{bq_dataset}.{table_name}`"
         query_job = bq_client.query(query)
         
         for row in query_job.result():
@@ -222,19 +249,19 @@ def get_last_update_date(bq_client, table_name):
 # Fonction principale
 #----------------------------
 
-def jira_to_bq():
+def jira_to_bq(jira_project, gcp_project, bq_dataset):
 
     field_mapping = get_fields_map(jira)
-    pj_issues_types = jira.issue_types_for_project(projectIdOrKey=JIRA_PROJECT)
+    pj_issues_types = jira.issue_types_for_project(projectIdOrKey=jira_project)
 
     for issue_type in pj_issues_types:
 
         logging.info(f"Traitement de {issue_type.name}")
         table_name = to_bigquery_name(issue_type.name)
 
-        jira_format_date = get_last_update_date(bq_client, table_name)
+        jira_format_date = get_last_update_date(bq_client, table_name, gcp_project, bq_dataset)
         
-        jql_query = f'project={JIRA_PROJECT} AND issuetype="{issue_type.name}"'
+        jql_query = f'project={jira_project} AND issuetype="{issue_type.name}"'
         
         # si on a une date d'update on traite le différentiel, sinon on crée une table avec toutes les issues
         if jira_format_date:
@@ -248,11 +275,11 @@ def jira_to_bq():
             df = create_df(issues, field_mapping)
 
             if not df.empty:
-                load_to_bq(bq_client, df, table_name)
+                load_to_bq(bq_client, df, table_name, bq_dataset)
 
                 # traitement du différentiel
                 if jira_format_date:
-                    merge_tables(bq_client, initial_table, table_name)
+                    merge_tables(bq_client, initial_table, table_name, gcp_project, bq_dataset)
 
         except Exception as e:
             logging.error(f"Erreur lors du traitement de l'issue type {issue_type.name}: {e}")
@@ -261,37 +288,13 @@ def jira_to_bq():
     return "ok"
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    args = parse_arguments()
 
-    parser.add_argument(
-        '--jira-project',
-        type=str,
-        required=True,
-        help='clé du projet jira ex: DATA')
+    #----------------------------
+    # Clients
+    #----------------------------
 
-    parser.add_argument(
-        '--gcp-project',
-        type=str,
-        required=True,
-        help='nom du projet GCP')
+    bq_client = bigquery.Client(credentials=scoped_credentials)
+    jira = JIRA(server=JIRA_URL, token_auth=args.jira_token)
 
-    parser.add_argument(
-        '--bq-dataset',
-        type=str,
-        required=True,
-        help='nom du dataset BQ')
-    
-    parser.add_argument(
-        '--jira-token',
-        type=str,
-        required=True,
-        help='token du SA bigquery pour jira')
-
-    args = parser.parse_args() # transforme les - en _
-
-    JIRA_PROJECT = args.jira_project
-    GCP_PROJECT_ID = args.gcp_project
-    BQ_DATASET = args.bq_dataset
-    JIRA_TOKEN = args.jira_token
-
-    jira_to_bq()
+    jira_to_bq(args.jira_projec, args.gcp_project, args.bq_dataset)
