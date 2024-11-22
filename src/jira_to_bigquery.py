@@ -275,7 +275,7 @@ def jira_to_bq(jira_project, gcp_project, bq_dataset):
             df = create_df(issues, field_mapping)
 
             if not df.empty:
-                load_to_bq(bq_client, df, table_name, bq_dataset)
+                load_to_bq(bq_client, df, table_name, gcp_project, bq_dataset)
 
                 # traitement du différentiel
                 if jira_format_date:
