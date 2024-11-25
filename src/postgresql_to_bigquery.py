@@ -46,7 +46,7 @@ def query_factory(schema: str, exclude: str = None) -> str:
 
 def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str):
     query = query_factory(schema, exclude)
-
+    get_logger(spark).info("liste des tables : %s" % query)
     table_names = spark.read \
                        .format("jdbc") \
                        .option("url", url) \
