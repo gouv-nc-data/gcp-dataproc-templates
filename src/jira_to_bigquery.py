@@ -20,21 +20,14 @@ import google.cloud.logging
 JIRA_URL = "https://jira.gouv.nc"
 
 # traité par argparse
-# JIRA_PROJECT = "" # ex PSPC
-
-# # PROD
-# GCP_PROJECT_ID = "" # ex prj-davar-p-bq-a01c
-# BQ_DATASET = "" # ex pspc
+# jira_project = "" # ex PSPC
+# gcp_project = "" # ex prj-davar-p-bq-a01c
+# bq_dataset = "" # ex pspc
 
 #----------------------------
 # auth
 #----------------------------
-
-# # jira
-# JIRA_TOKEN = os.environ['JIRA_TOKEN']
-# if not JIRA_TOKEN:
-#     raise ValueError("JIRA_TOKEN is not set in the environment.")
-
+# jira_token = ""
 # GCP
 cred_file = '' # ex: prj-davar-p-bq-a01c-c04f4c56dc89.json
 env_local = os.path.exists(cred_file)
@@ -99,7 +92,21 @@ def parse_arguments():
         required=True,
         help='token du SA bigquery pour jira'
         )
-
+    
+    parser.add_argument(
+        '--exclude-issues',
+        type=str,
+        default="",
+        help='keys des issues à exclure'
+        )
+    
+    parser.add_argument(
+        '--table-type',
+        type=str,
+        default="struct",
+        help='flat ou struct'
+        )
+    
     args = parser.parse_args() # transforme les - en _
     return args
 
@@ -127,16 +134,29 @@ def get_fields_map(jira):
     field_mapping = {field['id']: to_bigquery_name(field['name']) for field in jira_fields}
     return field_mapping
 
-def fetch_all_issues(client, jql_query, max_results=100):
+def fetch_all_issues(client, jql_query, max_results=100, table_type="struct"):
     logging.info('Début récolte des issues')
     all_issues = []
     start_at = 0
 
     while True:
-        issues = client.search_issues(jql_query, startAt=start_at, maxResults=max_results, fields='*all')
-        if not issues:
-            break
+
+        if table_type == 'struct':
+            issues = client.search_issues(jql_query, startAt=start_at, maxResults=max_results, fields='*all', json_result=True)
+            if len(issues['issues']) == 0:
+                break
+
+            issues = [{**issue['fields'], "jira": issue['key']} for issue in issues['issues']]
+
+        elif table_type == 'flat':
+            issues = client.search_issues(jql_query, startAt=start_at, maxResults=max_results, fields='*all')
+            if not issues:
+                break
+        else:
+            logging.error("type de table non géré")
+
         all_issues.extend(issues)
+
         start_at += max_results
         if len(all_issues) % 5000 == 0:
             logging.info(f'{len(all_issues)} issues récoltées jusqu\'à présent.')
@@ -173,14 +193,42 @@ exclusion_keys = [
     # 'comment'
     ]
 
-def load_to_bq(client, df, table_name, gcp_project, bq_dataset): 
-   # Charger les données dans BigQuery
-    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
+def load_to_bq(client, issues, table_name, gcp_project, bq_dataset, table_type): 
+
     destination = f"{gcp_project}.{bq_dataset}.{table_name}"
-    job = client.load_table_from_dataframe(df, destination, job_config=job_config)
+
+    if table_type == 'struct':
+        job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE",
+                                        autodetect = True
+                                        )
+        job = client.load_table_from_json(issues, destination, job_config=job_config)
+
+    elif table_type == 'flat':
+
+        job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
+        job = client.load_table_from_dataframe(issues, destination, job_config=job_config)
+
     job.result()  # Attendre la fin du job
 
     logging.info(f"Les données pour le type d'issue '{table_name}' ont été insérées avec succès.")
+
+def format_issues(issues, field_mapping, exclusion_keys=[]):
+
+    issues = [{field_mapping.get(k, k): v for k, v in item.items()} for item in issues]
+
+    if len(exclusion_keys) != 0:
+        issues = [{k: v for k, v in item.items() if k not in exclusion_keys} for item in issues]
+
+    return issues
+
+def clean_empty_structs(data):
+    """Nettoie les structures vides dans une liste de dictionnaires."""
+    if isinstance(data, list):
+        return [clean_empty_structs(item) for item in data]
+    elif isinstance(data, dict):
+        return {k: clean_empty_structs(v) if v != {} else None for k, v in data.items()}
+    else:
+        return data
 
 def create_df(issues, field_mapping):
         data = []
@@ -245,56 +293,79 @@ def get_last_update_date(bq_client, table_name, gcp_project, bq_dataset):
         
         return None
 
+def string_to_list(string_data):
+    # format "'data1','data2','data3'"
+    if not string_data.strip():
+        return []
+    else:
+        return [item.strip().strip("'") for item in string_data.split(',')]
+
 #----------------------------
 # Fonction principale
 #----------------------------
 
-def jira_to_bq(jira_project, gcp_project, bq_dataset):
+def jira_to_bq(jira_project, gcp_project, bq_dataset, jira_token, exclude_issues="", table_type='struct'):
+
+    # Clients
+    bq_client = bigquery.Client(credentials=scoped_credentials)
+    jira = JIRA(server=JIRA_URL, token_auth=jira_token)
 
     field_mapping = get_fields_map(jira)
     pj_issues_types = jira.issue_types_for_project(projectIdOrKey=jira_project)
 
+    exclude_issues = string_to_list(exclude_issues)
+
     for issue_type in pj_issues_types:
 
-        logging.info(f"Traitement de {issue_type.name}")
-        table_name = to_bigquery_name(issue_type.name)
+        if issue_type not in exclude_issues:
 
-        jira_format_date = get_last_update_date(bq_client, table_name, gcp_project, bq_dataset)
-        
-        jql_query = f'project={jira_project} AND issuetype="{issue_type.name}"'
-        
-        # si on a une date d'update on traite le différentiel, sinon on crée une table avec toutes les issues
-        if jira_format_date:
-            jql_query = jql_query +  f' AND updated >= "{jira_format_date}"'
-            initial_table = table_name
-            table_name = '_tmp_' + table_name
-        
-        try:    
-            issues = fetch_all_issues(jira, jql_query)
+            logging.info(f"Traitement de {issue_type.name}")
+            table_name = to_bigquery_name(issue_type.name)
+
+            if issue_type.subtask:
+                table_name = table_name + '_subtask'
+
+            jira_format_date = get_last_update_date(bq_client, table_name, gcp_project, bq_dataset)
             
-            df = create_df(issues, field_mapping)
+            jql_query = f'project={jira_project} AND issuetype="{issue_type.name}"'
+            
+            # si on a une date d'update on traite le différentiel, sinon on crée une table avec toutes les issues
+            if jira_format_date:
+                jql_query = jql_query +  f' AND updated >= "{jira_format_date}"'
+                initial_table = table_name
+                table_name = '_tmp_' + table_name
+            
+            try:    
+                issues = fetch_all_issues(jira, jql_query)
 
-            if not df.empty:
-                load_to_bq(bq_client, df, table_name, gcp_project, bq_dataset)
+                if table_type == 'struct':
+                    issues = format_issues(issues, field_mapping, exclusion_keys)
+                    issues = clean_empty_structs(issues)
 
-                # traitement du différentiel
-                if jira_format_date:
-                    merge_tables(bq_client, initial_table, table_name, gcp_project, bq_dataset)
+                    if len(issues) != 0:
+                        load_to_bq(bq_client, issues, table_name, gcp_project, bq_dataset, table_type)
 
-        except Exception as e:
-            logging.error(f"Erreur lors du traitement de l'issue type {issue_type.name}: {e}")
-            continue
+                        # traitement du différentiel
+                        if jira_format_date:
+                            merge_tables(bq_client, initial_table, table_name, gcp_project, bq_dataset)
+
+                elif table_type == 'flat':
+                    df = create_df(issues, field_mapping)
+
+                    if not df.empty:
+                        load_to_bq(bq_client, df, table_name, gcp_project, bq_dataset, table_type)
+
+                        # traitement du différentiel
+                        if jira_format_date:
+                            merge_tables(bq_client, initial_table, table_name, gcp_project, bq_dataset)
+
+            except Exception as e:
+                logging.error(f"Erreur lors du traitement de l'issue type {issue_type.name}: {e}")
+                continue
 
     return "ok"
 
 if __name__ == "__main__":
     args = parse_arguments()
 
-    #----------------------------
-    # Clients
-    #----------------------------
-
-    bq_client = bigquery.Client(credentials=scoped_credentials)
-    jira = JIRA(server=JIRA_URL, token_auth=args.jira_token)
-
-    jira_to_bq(args.jira_project, args.gcp_project, args.bq_dataset)
+    jira_to_bq(args.jira_project, args.gcp_project, args.bq_dataset, args.jira_token, args.exclude_issues, args.table_type)
