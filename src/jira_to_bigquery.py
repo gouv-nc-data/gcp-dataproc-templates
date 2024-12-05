@@ -142,11 +142,11 @@ def fetch_all_issues(client, jql_query, max_results=100, table_type="struct"):
     while True:
 
         if table_type == 'struct':
-            issues = client.search_issues(jql_query, startAt=start_at, maxResults=max_results, fields='*all', json_result=True)
+            issues = client.search_issues(jql_query, startAt=start_at, maxResults=max_results, fields='*all', json_result=True, expand='changelog')
             if len(issues['issues']) == 0:
                 break
 
-            issues = [{**issue['fields'], "jira": issue['key']} for issue in issues['issues']]
+            issues = [{"jira": issue['key'], "id": issue['id'], **issue['fields'], "changelog": issue['changelog']} for issue in issues['issues']]
 
         elif table_type == 'flat':
             issues = client.search_issues(jql_query, startAt=start_at, maxResults=max_results, fields='*all')
