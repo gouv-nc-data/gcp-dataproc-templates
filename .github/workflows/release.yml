@@ -45,6 +45,12 @@ jobs:
         destination: 'bucket-prj-dinum-data-templates-66aa'
         gzip: false
 
+    - id: 'upload-oracle-script-dev'
+      uses: 'google-github-actions/upload-cloud-storage@v2'
+      with:
+        path: 'src/jira_to_bigquery_dev.py'
+        destination: 'bucket-prj-dinum-data-templates-66aa'
+        gzip: false
 
     # # A implementer
     # - name: Get modified files
