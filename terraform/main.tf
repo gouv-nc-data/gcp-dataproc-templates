@@ -68,14 +68,14 @@ resource "google_project_iam_member" "service_account_bindings" {
 #---------------------------------------------------------
 module "bigquery-dataset-dev" {
   source     = "git::https://github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/bigquery-dataset?ref=v26.0.0"
-  project_id = module.dinum-exp-datawarehouse.project_id
+  project_id = module.project-factory.project_id
   id         = "dataset_dev"
   location   = "EU"
 }
 
 module "oracle2bq-function" {
   source       = "git::https://github.com/gouv-nc-data/gcp-function.git//?ref=feature/add_vpn_option"
-  project_id   = module.dinum-exp-datawarehouse.project_id
+  project_id   = module.project-factory.project_id
   project_name = "oracle2bq"
   group_name   = local.dinum_exp_group_name
   region       = var.region
@@ -85,7 +85,7 @@ module "oracle2bq-function" {
   #   "JIRA_TOKEN" : data.google_secret_manager_secret_version.jira-bq-key-secret.secret_data
   # }
   direction             = local.dinum_exp_name
-  notification_channels = module.dinum-exp-datawarehouse.notification_channels
+  notification_channels = module.project-factory.notification_channels
   create_bucket         = false # le true par défaut bloque la montée de version du provider
   enable_vpn            = true
 }
