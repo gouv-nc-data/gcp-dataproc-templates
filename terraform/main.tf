@@ -85,7 +85,7 @@ module "oracle2bq-function" {
   #   "JIRA_TOKEN" : data.google_secret_manager_secret_version.jira-bq-key-secret.secret_data
   # }
   direction             = local.dinum_exp_name
-  notification_channels = module.project-factory.notification_channels
+  notification_channels = []
   create_bucket         = false # le true par défaut bloque la montée de version du provider
   enable_vpn            = true
 }
