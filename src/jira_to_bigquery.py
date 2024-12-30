@@ -316,7 +316,7 @@ def format_parser(issues, schema_fields):
                     issue[field.name] = format_parser([issue[field.name]], field.fields)[0]
     return issues
 
-def create_union_table(issues_features):
+def create_union_table(issues_features, gcp_project, bq_dataset):
 
     first_key = True
 
@@ -402,15 +402,15 @@ def jira_to_bq(jira_project, gcp_project, bq_dataset, jira_token, exclusion_fiel
                 continue
 
     # traitement du différentiel
-    union_table = create_union_table(issues_features)
+    union_table = create_union_table(issues_features, gcp_project, bq_dataset)
 
     for issue_type in pj_issues_types:      
 
         if issues_features[issue_type]['jira_format_date'] is not None and issues_features[issue_type]['len'] != 0:
             merge_tables(bq_client,
-                        issues_features[issue_type]['initial_table'], 
-                        issues_features[issue_type]['table_name'], 
-                        gcp_project, 
+                        issues_features[issue_type]['initial_table'],
+                        issues_features[issue_type]['table_name'],
+                        gcp_project,
                         bq_dataset,
                         union_table)
 
