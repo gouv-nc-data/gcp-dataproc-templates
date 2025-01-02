@@ -247,7 +247,7 @@ def merge_tables(bq_client, target, source, gcp_project, bq_dataset, union_table
     delete_query  = f"""
     DELETE FROM `{gcp_project}.{bq_dataset}.{target}`
     WHERE jira IN (
-    {union_table}`
+    {union_table}
     )
     """
     bq_client.query(delete_query )
