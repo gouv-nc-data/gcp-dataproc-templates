@@ -1,5 +1,8 @@
-import os, re, logging
+import os
+import re
+import logging
 import argparse
+import pytz
 
 from jira import JIRA
 import pandas as pd
@@ -194,14 +197,12 @@ def reformat_timestamp(timestamp):
     try:
         # Tente de parser différents formats de timestamp
         dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%f%z")  # Avec timezone
+        tz = pytz.timezone("UTC")  # Adaptez si nécessaire
+        dt = dt.astimezone(tz)
         return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
     except ValueError:
-        try:
-            dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")  # Format UTC
-            return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
-        except ValueError:
-            logging.error(f"Error : can't convert {timestamp}")
-            return None
+        logging.error(f"Error : can't convert {timestamp}")
+        return None
 
 def format_issues(issues, field_mapping, schema, exclusion_fields=[]):
 
