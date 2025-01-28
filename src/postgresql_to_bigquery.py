@@ -2,6 +2,7 @@ from pyspark.sql import SparkSession
 import argparse
 from typing import Optional
 from logging import Logger
+import time
 
 
 def get_logger(spark: SparkSession) -> Logger:
@@ -21,20 +22,26 @@ def get_logger(spark: SparkSession) -> Logger:
 
 def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
     get_logger(spark).info("migration table %s" % table_name['table_name'])
+    start_time = time.time()
     df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "org.postgresql.Driver"})
-    # get_logger(spark).info("###############################################")
+    elapsed_time = time.time() - start_time
+    get_logger(spark).info(f"Table {table_name['table_name']} chargée en {elapsed_time:.2f} secondes.")
+    
     # get_logger(spark).info(df.head())
     for c_name, c_type in df.dtypes:
         if c_type.startswith('decimal'):
             get_logger(spark).info("conversion de decimal vers float de la colonne %s" % c_name)
             df = df.withColumn(c_name, df[c_name].cast("float"))
     get_logger(spark).info("upload de la table %s" % table_name['table_name'])
+
+    start_time = time.time()
     df.write \
         .format("bigquery") \
         .option("writeMethod", "direct") \
         .mode(mode) \
         .save("%s.%s" % (dataset, table_name['table_name']))
-
+    elapsed_time = time.time() - start_time
+    get_logger(spark).info(f"Table {table_name['table_name']} uploadée en {elapsed_time:.2f} secondes.")
 
 def query_factory(schema: str, exclude: str = None) -> str:
     if exclude != "":
@@ -113,10 +120,14 @@ if __name__ == '__main__':
         .getOrCreate()
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
+    input_url = known_args.jdbc_url
+    if input_url[:5] != "jdbc:":
+        input_url = "jdbc:%s" % known_args.jdbc_url
+
     run(app_name="database transfert",
         spark=spark,
         schema=known_args.schema,
-        url="jdbc:%s" % known_args.jdbc_url,
+        url=input_url,
         dataset=known_args.dataset,
         mode=known_args.mode,
         exclude=known_args.exclude)
