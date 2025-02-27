@@ -189,13 +189,13 @@ def convert_to_utc(date_str):
 def traverse_and_convert(data, pattern):
     """Parcourt un JSON et convertit toutes les dates détectées en UTC"""
     if isinstance(data, dict):
-        return {key: traverse_and_convert(value) for key, value in data.items()}
+        return {key: traverse_and_convert(value, pattern) for key, value in data.items()}
     elif isinstance(data, list):
-        return [traverse_and_convert(item) for item in data]
+        return [traverse_and_convert(item, pattern) for item in data]
     elif isinstance(data, str) and pattern.match(data):
         return convert_to_utc(data)
     else:
-        return data  
+        return data
 
 
 def format_issues(issues, field_mapping, exclusion_fields=[]):
@@ -354,7 +354,7 @@ def jira_to_bq(jira_project, gcp_project, bq_dataset, jira_token, exclusion_fiel
 
                 if jira_format_date:
                     merge_tables(bq_client, initial_table, issue_table_name_bq, gcp_project, bq_dataset)
-            logging.info("End of treatment of  %s", issue_name)
+            logging.info("End of treatment of %s", issue_name)
     
     return "ok"
 
