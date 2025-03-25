@@ -19,7 +19,7 @@ def get_logger(spark: SparkSession) -> Logger:
     return log_4j_logger.LogManager.getLogger(__name__)
 
 
-def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, dataset: str, mode: str):
+def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, dataset: str, mode: str, gcs_bucket: str):
     get_logger(spark).info("test! %s" % table_name.__class__.__name__)
     get_logger(spark).info("migration table %s" % table_name)
     df = spark.read.jdbc(url, "%s.%s" % (schema, table_name['TABLE_NAME']), properties={"driver": "oracle.jdbc.driver.OracleDriver",
@@ -34,7 +34,7 @@ def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, da
     get_logger(spark).info("upload de la table %s" % table_name)
     df.write \
         .format("bigquery") \
-        .option("writeMethod", "direct") \
+        .option("temporaryGcsBucket", gcs_bucket) \
         .mode(mode) \
         .save("%s.%s" % (dataset, table_name['TABLE_NAME']))
 
@@ -48,7 +48,7 @@ def query_factory(spark: SparkSession, schema: str, exclude: str = None) -> str:
     return query
 
 
-def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str):
+def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str, gcs_bucket: str):
     query = query_factory(spark, schema, exclude)
 
     table_names = spark.read \
@@ -64,7 +64,7 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
     get_logger(spark).info("migration de %s tables" % table_names.count())
     get_logger(spark).info(table_names.show())
     for table_name in table_names.collect():
-        upload_table(spark, schema, table_name, url, dataset, mode)
+        upload_table(spark, schema, table_name, url, dataset, mode, gcs_bucket)
 
     get_logger(spark).info("fin migration")
 
@@ -108,6 +108,13 @@ if __name__ == '__main__':
         required=False,
         default="",
         help='tables à exclure de la migration')
+    
+    parser.add_argument(
+        '--gcs-bucket',
+        type=str,
+        dest='gcs_bucket',
+        required=True,
+        help='nom du bucket pour le stockage des fichiers intermédiaires')
 
     known_args, pipeline_args = parser.parse_known_args()
 
@@ -122,4 +129,5 @@ if __name__ == '__main__':
         url="jdbc:%s" % known_args.jdbc_url,
         dataset=known_args.dataset,
         mode=known_args.mode,
-        exclude=known_args.exclude)
+        exclude=known_args.exclude,
+        gcs_bucket=known_args.gcs_bucket)
