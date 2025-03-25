@@ -49,7 +49,7 @@ def query_factory(spark: SparkSession, schema: str, exclude: str = None) -> str:
 
 
 def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str):
-    query = query_factory(schema, exclude)
+    query = query_factory(spark, schema, exclude)
 
     table_names = spark.read \
                        .format("jdbc") \
