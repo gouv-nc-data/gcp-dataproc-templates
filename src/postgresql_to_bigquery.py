@@ -20,7 +20,7 @@ def get_logger(spark: SparkSession) -> Logger:
     return log_4j_logger.LogManager.getLogger(__name__)
 
 
-def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str):
+def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str, bucket: str):
     get_logger(spark).info("migration table %s" % table_name['table_name'])
     start_time = time.time()
     df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "org.postgresql.Driver"})
@@ -35,11 +35,18 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     get_logger(spark).info("upload de la table %s" % table_name['table_name'])
 
     start_time = time.time()
-    df.write \
-        .format("bigquery") \
-        .option("writeMethod", "direct") \
-        .mode(mode) \
-        .save("%s.%s" % (dataset, table_name['table_name']))
+    if len(bucket) > 0:
+        df.write \
+            .format("bigquery") \
+            .option("temporaryGcsBucket", bucket) \
+            .mode(mode) \
+            .save("%s.%s" % (dataset, table_name['table_name']))
+    else:
+        df.write \
+            .format("bigquery") \
+            .option("writeMethod", "direct") \
+            .mode(mode) \
+            .save("%s.%s" % (dataset, table_name['table_name']))
     elapsed_time = time.time() - start_time
     get_logger(spark).info(f"Table {table_name['table_name']} uploadée en {elapsed_time:.2f} secondes.")
 
@@ -51,7 +58,7 @@ def query_factory(schema: str, exclude: str = None) -> str:
     return query
 
 
-def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str):
+def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str, bucket: str):
     query = query_factory(schema, exclude)
     get_logger(spark).info("liste des tables : %s" % query)
     table_names = spark.read \
@@ -68,7 +75,7 @@ def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dat
     get_logger(spark).info("migration de %s tables" % table_names.count())
 
     for table_name in table_names.collect():
-        upload_table(spark, table_name, url, dataset, mode)
+        upload_table(spark, table_name, url, dataset, mode, bucket)
 
     get_logger(spark).info("fin migration")
 
@@ -112,6 +119,14 @@ if __name__ == '__main__':
         required=False,
         default="",
         help='tables à exclure de la migration')
+
+    parser.add_argument(
+        '--bucket',
+        type=str,
+        dest='bucket',
+        required=False,
+        default="",
+        help='bucket temporaire')
 
     known_args, pipeline_args = parser.parse_known_args()
 
