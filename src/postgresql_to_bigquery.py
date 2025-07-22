@@ -145,4 +145,5 @@ if __name__ == '__main__':
         url=input_url,
         dataset=known_args.dataset,
         mode=known_args.mode,
-        exclude=known_args.exclude)
+        exclude=known_args.exclude,
+        bucket=known_args.bucket)
