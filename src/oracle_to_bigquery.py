@@ -34,6 +34,7 @@ def upload_table(spark: SparkSession, schema: str, table_name: str, url: str, da
     get_logger(spark).info("upload de la table %s" % table_name)
     df.write \
         .format("bigquery") \
+        .option("writeMethod", "direct") \
         .mode(mode) \
         .save("%s.%s" % (dataset, table_name['TABLE_NAME']))
 
