@@ -19,7 +19,7 @@ import google.cloud.logging
 # Context
 #----------------------------
 
-JIRA_URL = "https://jira.gouv.nc"
+# JIRA_URL = "https://jira.gouv.nc"
 
 # traité par argparse
 # jira_project = "" # ex PSPC
@@ -83,6 +83,13 @@ def parse_arguments():
         type=str,
         required=True,
         help='name of BigQuery dataset'
+        )
+    
+    parser.add_argument(
+        '--jira-url',
+        type=str,
+        required=True,
+        help='URL of the Jira instance'
         )
     
     parser.add_argument(
@@ -296,11 +303,11 @@ WHERE jira IN (SELECT jira FROM `{gcp_project}.{bq_dataset}.{source}`);
 # Fonction principale
 #----------------------------
 
-def jira_to_bq(jira_project, gcp_project, bq_dataset, jira_token, exclusion_fields="", exclusion_types=""):
+def jira_to_bq(jira_project, gcp_project, bq_dataset, jira_url, jira_token, exclusion_fields="", exclusion_types=""):
 
     # Clients
     bq_client = bigquery.Client(credentials=scoped_credentials)
-    jira = JIRA(server=JIRA_URL, token_auth=jira_token)
+    jira = JIRA(server=jira_url, token_auth=jira_token)
 
     field_mapping = get_fields_map(jira)
     pj_issues_types = jira.issue_types_for_project(projectIdOrKey=jira_project)
@@ -361,4 +368,4 @@ def jira_to_bq(jira_project, gcp_project, bq_dataset, jira_token, exclusion_fiel
 if __name__ == "__main__":
     args = parse_arguments()
 
-    jira_to_bq(args.jira_project, args.gcp_project, args.bq_dataset, args.jira_token, args.exclusion_fields, args.exclusion_types)
+    jira_to_bq(args.jira_project, args.gcp_project, args.bq_dataset, args.jira_url, args.jira_token, args.exclusion_fields, args.exclusion_types)
