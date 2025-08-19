@@ -27,6 +27,13 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     elapsed_time = time.time() - start_time
     get_logger(spark).info(f"Table {table_name['table_name']} chargée en {elapsed_time:.2f} secondes.")
     
+    get_logger(spark).info(f"Nombre de lignes dans la table {table_name['table_name']}: {df.count()}")
+    get_logger(spark).info(f"Schéma de la table {table_name['table_name']}: {df.dtypes}")
+    try:
+        get_logger(spark).info(f"Premières lignes de la table {table_name['table_name']}: {df.head(5)}")
+    except Exception as e:
+        get_logger(spark).warning(f"Impossible d'afficher les premières lignes de la table {table_name['table_name']}: {e}")
+
     # get_logger(spark).info(df.head())
     for c_name, c_type in df.dtypes:
         if c_type.startswith('decimal'):
@@ -45,6 +52,8 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
         df.write \
             .format("bigquery") \
             .option("writeMethod", "direct") \
+            .option("allowFieldAddition", "true") \
+            .option("allowFieldRelaxation", "true") \
             .mode(mode) \
             .save("%s.%s" % (dataset, table_name['table_name']))
     elapsed_time = time.time() - start_time
