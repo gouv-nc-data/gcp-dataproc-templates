@@ -3,6 +3,7 @@ import argparse
 from typing import Optional
 from logging import Logger
 import time
+import math
 
 
 def get_logger(spark: SparkSession) -> Logger:
@@ -19,26 +20,64 @@ def get_logger(spark: SparkSession) -> Logger:
     log_4j_logger = spark.sparkContext._jvm.org.apache.log4j  # pylint: disable=protected-access
     return log_4j_logger.LogManager.getLogger(__name__)
 
+def get_table_size_bytes(spark: SparkSession, url: str, table_name: str) -> int:
+    """
+    Exécute une requête sur PostgreSQL pour obtenir la taille totale d'une table en octets.
+    """
+    # Requête pour obtenir la taille de la table dans PostgreSQL
+    query = f"(SELECT pg_total_relation_size('{table_name}')) as size"
+    try:
+        size_df = spark.read.jdbc(url, query, properties={"driver": "org.postgresql.Driver"})
+        size_bytes = size_df.first()['size']
+        get_logger(spark).info(f"Taille estimée pour la table {table_name}: {size_bytes / 1e6:.2f} MB")
+        return size_bytes if size_bytes else 0
+    except Exception as e:
+        get_logger(spark).warning(f"Impossible d'estimer la taille de la table {table_name}: {e}. Utilisation d'une valeur par défaut.")
+        return 0 # Retourne 0 en cas d'erreur
 
 def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, mode: str, bucket: str):
     get_logger(spark).info("migration table %s" % table_name['table_name'])
     start_time = time.time()
+
+    # --- STRATÉGIE DYNAMIQUE ---
+    # 1. Définir une taille cible par partition
+    TARGET_PARTITION_SIZE_BYTES = 9 * 1024 * 1024  # 9 MB
+
+    # 2. Obtenir la taille totale de la table source
+    total_size_bytes = get_table_size_bytes(spark, url, table_name)
+    
+    # 3. Calculer le nombre de partitions nécessaires
+    if total_size_bytes > 0:
+        num_partitions = math.ceil(total_size_bytes / TARGET_PARTITION_SIZE_BYTES)
+    else:
+        # Si la taille ne peut pas être déterminée, on se rabat sur une valeur par défaut
+        num_partitions = 20 # Une petite valeur par défaut pour les petites tables ou en cas d'erreur
+
+    # Assurer un minimum d'une partition
+    num_partitions = max(1, num_partitions)
+    
+    get_logger(spark).info(f"Nombre de partitions calculé pour {table_name}: {num_partitions}")
+    # --- FIN STRATÉGIE ---
+
     df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "org.postgresql.Driver"})
     elapsed_time = time.time() - start_time
     get_logger(spark).info(f"Table {table_name['table_name']} chargée en {elapsed_time:.2f} secondes.")
     
     get_logger(spark).info(f"Nombre de lignes dans la table {table_name['table_name']}: {df.count()}")
-    get_logger(spark).info(f"Schéma de la table {table_name['table_name']}: {df.dtypes}")
-    try:
-        get_logger(spark).info(f"Premières lignes de la table {table_name['table_name']}: {df.head(5)}")
-    except Exception as e:
-        get_logger(spark).warning(f"Impossible d'afficher les premières lignes de la table {table_name['table_name']}: {e}")
+    # get_logger(spark).info(f"Schéma de la table {table_name['table_name']}: {df.dtypes}")
+    # try:
+    #     get_logger(spark).info(f"Premières lignes de la table {table_name['table_name']}: {df.head(5)}")
+    # except Exception as e:
+    #     get_logger(spark).warning(f"Impossible d'afficher les premières lignes de la table {table_name['table_name']}: {e}")
 
-    # get_logger(spark).info(df.head())
     for c_name, c_type in df.dtypes:
         if c_type.startswith('decimal'):
             get_logger(spark).info("conversion de decimal vers float de la colonne %s" % c_name)
             df = df.withColumn(c_name, df[c_name].cast("float"))
+
+    # Appliquer le repartitionnement dynamique
+    df = df.repartition(num_partitions)
+
     get_logger(spark).info("upload de la table %s" % table_name['table_name'])
 
     start_time = time.time()
