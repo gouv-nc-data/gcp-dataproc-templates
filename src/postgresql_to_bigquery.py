@@ -24,7 +24,7 @@ def get_table_size_bytes(spark: SparkSession, url: str, table_name: str) -> int:
     Exécute une requête sur PostgreSQL pour obtenir la taille totale d'une table en octets.
     """
     # Requête pour obtenir la taille de la table dans PostgreSQL
-    query = f"SELECT pg_total_relation_size('{table_name}') as size"
+    query = f"(SELECT pg_total_relation_size('{table_name}'))"
     get_logger(spark).info("Requête pour obtenir la taille de la table: %s" % query)
     try:
         size_df = spark.read.jdbc(url, query, properties={"driver": "org.postgresql.Driver"})
