@@ -43,7 +43,7 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     TARGET_PARTITION_SIZE_BYTES = 9 * 1024 * 1024  # 9 MB
 
     # 2. Obtenir la taille totale de la table source
-    total_size_bytes = get_table_size_bytes(spark, url, table_name)
+    total_size_bytes = get_table_size_bytes(spark, url, table_name['table_name'])
     
     # 3. Calculer le nombre de partitions nécessaires
     if total_size_bytes > 0:
