@@ -28,7 +28,7 @@ def get_table_size_bytes(spark: SparkSession, url: str, table_name: str) -> int:
     get_logger(spark).info("Requête pour obtenir la taille de la table: %s" % query)
     try:
         size_df = spark.read.jdbc(url, query, properties={"driver": "org.postgresql.Driver"})
-        get_logger(spark).info("dataframe de taille de table: %s" % size_df.show())
+        # get_logger(spark).info("dataframe de taille de table: %s" % size_df.show())
         first_row = size_df.first()
         if first_row and len(first_row) > 0:
             size_bytes = first_row[0]
@@ -187,6 +187,7 @@ if __name__ == '__main__':
 
     spark = SparkSession.builder \
         .appName("PostgreSQL Migration with PySpark") \
+        .config("spark.network.timeout", "600s") \
         .getOrCreate()
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
