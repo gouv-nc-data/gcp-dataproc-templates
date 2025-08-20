@@ -3,7 +3,6 @@ import argparse
 from typing import Optional
 from logging import Logger
 import time
-import math
 
 
 def get_logger(spark: SparkSession) -> Logger:
@@ -48,7 +47,9 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     
     # 3. Calculer le nombre de partitions nécessaires
     if total_size_bytes > 0:
-        num_partitions = math.ceil(total_size_bytes / TARGET_PARTITION_SIZE_BYTES)
+        numerator = total_size_bytes
+        denominator = TARGET_PARTITION_SIZE_BYTES
+        num_partitions = (numerator + denominator - 1) // denominator  # Utilisation de la division entière pour arrondir vers le haut
     else:
         # Si la taille ne peut pas être déterminée, on se rabat sur une valeur par défaut
         num_partitions = 20 # Une petite valeur par défaut pour les petites tables ou en cas d'erreur
