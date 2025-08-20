@@ -25,9 +25,14 @@ def get_table_size_bytes(spark: SparkSession, url: str, table_name: str) -> int:
     """
     # Requête pour obtenir la taille de la table dans PostgreSQL
     query = f"(SELECT pg_total_relation_size('{table_name}')) as size"
+    get_logger(spark).info("Requête pour obtenir la taille de la table: %s" % query)
     try:
         size_df = spark.read.jdbc(url, query, properties={"driver": "org.postgresql.Driver"})
-        size_bytes = size_df.first()['size']
+        get_logger(spark).info("dataframe de taille de table: %s" % size_df.show())
+        first_row = size_df.first()
+        if first_row and len(first_row) > 0:
+            size_bytes = first_row[0]
+            # size_bytes = size_df.first()['size']
         get_logger(spark).info(f"Taille estimée pour la table {table_name}: {size_bytes / 1e6:.2f} MB")
         return size_bytes if size_bytes else 0
     except Exception as e:
