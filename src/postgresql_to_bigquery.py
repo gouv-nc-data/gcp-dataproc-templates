@@ -24,7 +24,7 @@ def get_table_size_bytes(spark: SparkSession, url: str, table_name: str) -> int:
     Exécute une requête sur PostgreSQL pour obtenir la taille totale d'une table en octets.
     """
     # Requête pour obtenir la taille de la table dans PostgreSQL
-    query = f"(SELECT pg_total_relation_size('{table_name}')) as size"
+    query = f"SELECT pg_total_relation_size('{table_name}') as size"
     get_logger(spark).info("Requête pour obtenir la taille de la table: %s" % query)
     try:
         size_df = spark.read.jdbc(url, query, properties={"driver": "org.postgresql.Driver"})
@@ -43,27 +43,7 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     get_logger(spark).info("migration table %s" % table_name['table_name'])
     start_time = time.time()
 
-    # --- STRATÉGIE DYNAMIQUE ---
-    # 1. Définir une taille cible par partition
-    TARGET_PARTITION_SIZE_BYTES = 9 * 1024 * 1024  # 9 MB
 
-    # 2. Obtenir la taille totale de la table source
-    total_size_bytes = get_table_size_bytes(spark, url, table_name['table_name'])
-    
-    # 3. Calculer le nombre de partitions nécessaires
-    if total_size_bytes > 0:
-        numerator = total_size_bytes
-        denominator = TARGET_PARTITION_SIZE_BYTES
-        num_partitions = (numerator + denominator - 1) // denominator  # Utilisation de la division entière pour arrondir vers le haut
-    else:
-        # Si la taille ne peut pas être déterminée, on se rabat sur une valeur par défaut
-        num_partitions = 20 # Une petite valeur par défaut pour les petites tables ou en cas d'erreur
-
-    # Assurer un minimum d'une partition
-    num_partitions = max(1, num_partitions)
-    
-    get_logger(spark).info(f"Nombre de partitions calculé pour {table_name}: {num_partitions}")
-    # --- FIN STRATÉGIE ---
 
     df = spark.read.jdbc(url, table_name['table_name'], properties={"driver": "org.postgresql.Driver"})
     elapsed_time = time.time() - start_time
@@ -81,8 +61,19 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
             get_logger(spark).info("conversion de decimal vers float de la colonne %s" % c_name)
             df = df.withColumn(c_name, df[c_name].cast("float"))
 
-    # Appliquer le repartitionnement dynamique
-    df = df.repartition(num_partitions)
+    # --- Partitionnement DYNAMIQUE ---
+    TARGET_PARTITION_SIZE_BYTES = 9 * 1024 * 1024  # 9 MB max si 10
+    total_size_bytes = get_table_size_bytes(spark, url, table_name['table_name'])
+
+    if total_size_bytes > 0:
+        numerator = total_size_bytes
+        denominator = TARGET_PARTITION_SIZE_BYTES
+        num_partitions = (numerator + denominator - 1) // denominator  # Utilisation de la division entière pour arrondir vers le haut
+
+        num_partitions = max(1, num_partitions)
+        get_logger(spark).info(f"Nombre de partitions calculé pour {table_name}: {num_partitions}")
+
+        df = df.repartition(num_partitions)  
 
     get_logger(spark).info("upload de la table %s" % table_name['table_name'])
 
@@ -104,16 +95,18 @@ def upload_table(spark: SparkSession, table_name: str, url: str, dataset: str, m
     elapsed_time = time.time() - start_time
     get_logger(spark).info(f"Table {table_name['table_name']} uploadée en {elapsed_time:.2f} secondes.")
 
-def query_factory(schema: str, exclude: str = None) -> str:
+def query_factory(schema: str, exclude: str = None, only: str = None) -> str:
     if exclude != "":
         query = "SELECT table_name FROM information_schema.tables where table_schema = '%s' and table_name not in (%s)" % (schema, exclude)
     else:
         query = "SELECT table_name FROM information_schema.tables where table_schema = '%s'" % schema
+    if only != "":
+        query += " and table_name in (%s)" % only
     return query
 
 
-def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str, bucket: str):
-    query = query_factory(schema, exclude)
+def run(spark: SparkSession, app_name: Optional[str], schema: str, url: str, dataset: str, mode: str, exclude: str, only: str, bucket: str):
+    query = query_factory(schema, exclude, only)
     get_logger(spark).info("liste des tables : %s" % query)
     table_names = spark.read \
                        .format("jdbc") \
@@ -173,6 +166,14 @@ if __name__ == '__main__':
         required=False,
         default="",
         help='tables à exclure de la migration')
+    
+    parser.add_argument(
+        '--only',
+        type=str,
+        dest='only',
+        required=False,
+        default="",
+        help='tables à inclure dans la migration')
 
     parser.add_argument(
         '--bucket',
@@ -192,6 +193,10 @@ if __name__ == '__main__':
     input_url = known_args.jdbc_url
     if input_url[:5] != "jdbc:":
         input_url = "jdbc:%s" % known_args.jdbc_url
+    
+    if known_args.only != "":
+        get_logger(spark).info("only est défini, exclusion ignorée")
+        known_args.exclude = ""
 
     run(app_name="database transfert",
         spark=spark,
@@ -200,4 +205,5 @@ if __name__ == '__main__':
         dataset=known_args.dataset,
         mode=known_args.mode,
         exclude=known_args.exclude,
+        only=known_args.only,
         bucket=known_args.bucket)
